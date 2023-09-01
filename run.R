@@ -25,16 +25,23 @@ prename <- "DML_"
 do_product <- FALSE
 model <- "1"
 conf_model <- gen_Y_conf
+data_model <- data_model
+g1_foo <- g1 
+g0_foo <- g0 
 
 # set parameters
+mc.cores_nrep <- 77
+mc.cores_nsim <- mc.cores_nrep
 nrep_graph <- 1000 
+nsim <- 5000
+nsim_inner <- 1000
 typeofgraph <-"WS" #c("rand_npfix", "WS")
 error.type <- "runif" 
 
 start_time_1 <- Sys.time()
 
 # for rand_npfix
-prob <- 0.01 # probability of an edge in random graphs
+prob <- 0.01 # 0.01 probability of an edge in random graphs
 const <- 3 # constant for random graphs with np = const
 
 # for WS
@@ -43,27 +50,30 @@ num.nei <- 2
 
 sigma_Y <- 0.1 # sigma for error term for Y
 sigma_C <- sqrt(1 / 12) # sigma for error term for C
-K <- 10 # number of sample splittings
-S <- 20 # number of times the sample splitting is repeated on one generated dataset
-nvals <- c(2500 / 4, 2500 / 2, 2500, 5000, 10000)
+K <- 5 # number of sample splittings
+S <- 1 # number of times the sample splitting is repeated on one generated dataset
+R <- 300 # number of bootstrap repetitions 
+do_bootscheme <- TRUE
+nvals <- 5000 * 2 ^ c(-3:6) 
 eta <- 1 
 cluster_Ik <- TRUE
+alpha = 0.05
 
 # rf settings
 num.trees <- 500 
 min.node.size <- 5 
 
-fun_model <- get(paste0("data_model", model))
-
 # function to compute sd
-get_sigma2 <- get_sigma2
 power_foo <- function(nval) {
   #nval ^ (1 / 9)
+  #1
   1
 }
 
 # save the setting 
-save_setting(nrep_graph = nrep_graph, 
+save_setting(simul_file = simul_file, nrep_graph = nrep_graph, 
+             nsim = nsim, # for computing theta0N
+             nsim_inner = nsim_inner, # for computing theta0N
              typeofgraph = typeofgraph, 
              error.type = error.type, 
              model = model, 
@@ -74,25 +84,31 @@ save_setting(nrep_graph = nrep_graph,
              sigma_C = sigma_C, 
              K = K, 
              S = S, 
+             #B = B, 
+             R = R, 
              nvals = nvals, 
              eta = eta, 
              prename = prename, 
              num.trees = num.trees, 
              min.node.size = min.node.size, 
-             fun_model = fun_model, 
-             feat_foo = feat_X1_C, 
+             fun_model = data_model, 
+             feat_foo = list(feat_X1_C = feat_X1_C, feat_C = feat_C), 
              conf_model = conf_model, 
-             g1 = g1, 
-             g0 = g0, 
+             g1 = g1_foo, 
+             g0 = g0_foo, 
              get_sigma2 = get_sigma2, 
              power_foo = power_foo, 
              cluster_Ik = cluster_Ik, 
-             num.nei = num.nei)
+             num.nei = num.nei, 
+             alpha = alpha, 
+             get_theta0N = get_theta0N, 
+             simulation_foo = simulation_foo, 
+             do_bootscheme = do_bootscheme, 
+             h_foo = h_foo, 
+             get_features_X = get_features_X)
 
 set.seed(1)
 seeds <- sample(c(0:10000), nrep_graph, replace = FALSE)
-
-mc.cores_nrep <- 100 
 
 
 for (nval in nvals) {
@@ -100,11 +116,14 @@ for (nval in nvals) {
   
   Results_nval <- 
     simulation_foo(typeofgraph = typeofgraph, nval = nval, mc.cores_nrep = mc.cores_nrep, 
+                   mc.cores_nsim = mc.cores_nsim, nsim = nsim, nsim_inner = nsim_inner,
                    nrep_graph = nrep_graph, error.type = error.type, sigma_C = sigma_C, 
-                   eta = eta, sigma_Y = sigma_Y, S = S, K = K, 
-                   fun_model = fun_model, num.trees = num.trees, 
+                   eta = eta, sigma_Y = sigma_Y, S = S, K = K, B = B, 
+                   data_model = data_model, num.trees = num.trees, 
                    prob = prob, const = const, prob.rewiring = prob.rewiring, 
-                   seeds = seeds, power_foo = power_foo, cluster_Ik = cluster_Ik)
+                   seeds = seeds, power_foo = power_foo, cluster_Ik = cluster_Ik, 
+                   model = model, R = R, only_netAIPW = TRUE, 
+                   alpha = alpha)
   
   filename <- paste0(prename, nval, "_", typeofgraph)
   
@@ -113,5 +132,5 @@ for (nval in nvals) {
   save(Results_nval, file = paste(filename, ".RData",sep=""))
 }
 
-(time_elapset <- Sys.time() - start_time_1)
+(time_elapsed <- Sys.time() - start_time_1)
 plot_results()
